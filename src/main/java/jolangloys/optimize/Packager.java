@@ -8,7 +8,12 @@ import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 
 /**
+ * Un objet Package est créé à partir d'une liste d'objets (représenté par des
+ * entiers correspondant à la taille de l'objet). Il permet d'itérer sur les
+ * cartons générés à partir de cette liste d'objets.
  * 
+ * Les objets sont classés par taille dans un {@link Multiset}, qui est vidé au
+ * fur et à mesure des appels à la méthode de lecture {@link Iterator#next()}
  * 
  * @author Johann Langloys
  */
@@ -22,9 +27,9 @@ public final class Packager implements Iterator<Package> {
 	private final int maxPackageSize;
 
 	/**
-	 * On regroupe les cartons par taille, en associant leur quantité via un
-	 * multiset guava. Si on ne souhaite pas utiliser guava, on peut le
-	 * remplacer par un HashMap<Integer, Integer>
+	 * Les "étagères". On regroupe les cartons par taille, en associant leur
+	 * quantité via un multiset guava. Si on ne souhaite pas utiliser guava, on
+	 * peut le remplacer par un HashMap<Integer, Integer>
 	 */
 	private final Multiset<Integer> shelves;
 
@@ -42,6 +47,16 @@ public final class Packager implements Iterator<Package> {
 		this.maxPackageSize = maxPackageSize;
 
 		this.shelves = HashMultiset.create(items);
+
+		// Vérification d'un cas impossible à résoudre: avoir des objets plus
+		// volumineux que la taille des cartons.
+		if (this.shelves.elementSet()
+				.stream()
+				.mapToInt(i -> i)
+				.max()
+				.orElse(0) > maxPackageSize) {
+			throw new IllegalArgumentException("Les objets ne doivent pas être plus volumineux que les cartons");
+		}
 	}
 
 	/**
@@ -71,11 +86,9 @@ public final class Packager implements Iterator<Package> {
 	}
 
 	/**
-	 * Détermine de la composition du prochain carton à remplir.
+	 * Calcul de la composition du prochain carton à remplir.
 	 * 
-	 * @param shelves
-	 *            Les éléments disponibles à mettre dans les cartons
-	 * @return La composition du carton.
+	 * @return La composition du prochain carton à remplir.
 	 */
 	private Package getNextPackage() {
 		final Package nextPackage = new Package();
@@ -91,7 +104,12 @@ public final class Packager implements Iterator<Package> {
 
 	/**
 	 * Détermine le prochain objet à prendre dans les rayons à partir de la
-	 * composition théorique du prochain carton.
+	 * composition théorique du prochain carton. La logique est simple: on prend
+	 * le plus grand objet disponible qui peut rentrer dans le carton.
+	 * 
+	 * Le prochain carton, fourni en paramètre, n'est pas encore retiré des
+	 * étagères. Il est donc pris en compte dans la comptabilisation de la
+	 * disponibilité des tailles.
 	 * 
 	 * @param nextPlannedPackage
 	 *            la composition prévue du prochain carton
@@ -113,7 +131,7 @@ public final class Packager implements Iterator<Package> {
 	/**
 	 * Vérifie dans les rangements si un objet d'une taille donnée est
 	 * disponible, en prenant en compte les objets que l'on compte déjà prendre
-	 * dans le prochain carton, pour qu'ils ne soient pas comptabilisé
+	 * dans le prochain carton, pour qu'ils ne soient pas comptabilisés
 	 * 
 	 * @param itemSize
 	 *            Taille de l'objet à vérifier
